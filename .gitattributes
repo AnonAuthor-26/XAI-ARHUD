@@ -1,0 +1,4 @@
+# Videos are stored with Git LFS (files > 100 MB can't go in plain Git)
+videos/*.mp4 filter=lfs diff=lfs merge=lfs -text
+videos/*.MP4 filter=lfs diff=lfs merge=lfs -text
+videos/*.mov filter=lfs diff=lfs merge=lfs -text

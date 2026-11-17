@@ -1,0 +1,56 @@
+# Deploys the site to GitHub Pages WITH the real LFS videos.
+# (Classic "deploy from branch" Pages would serve the LFS pointer files, not the videos.)
+# Settings > Pages > Source: "GitHub Actions".
+name: Deploy site with LFS videos
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: pages
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - name: Checkout (without LFS)
+        uses: actions/checkout@v4
+        with:
+          lfs: false
+
+      # Cache the LFS objects so a redeploy does not re-download the videos
+      # (every LFS download counts against your monthly LFS bandwidth).
+      - name: List LFS objects
+        run: git lfs ls-files -l | cut -d' ' -f1 | sort > .lfs-assets-id
+      - name: Restore LFS cache
+        uses: actions/cache@v4
+        with:
+          path: .git/lfs
+          key: lfs-${{ hashFiles('.lfs-assets-id') }}
+      - name: Pull LFS videos
+        run: git lfs pull
+
+      - name: Check site size (Pages limit 1 GB)
+        run: |
+          rm -f .lfs-assets-id
+          SIZE=$(du -sb --exclude=.git . | cut -f1)
+          echo "Site size: $((SIZE/1024/1024)) MB"
+          if [ "$SIZE" -gt 1000000000 ]; then echo "::error::Site is larger than 1 GB: GitHub Pages will reject it. Re-encode or trim the videos."; exit 1; fi
+
+      - uses: actions/configure-pages@v5
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: .
+      - id: deployment
+        uses: actions/deploy-pages@v4
